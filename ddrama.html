@@ -11,34 +11,49 @@
 </head>
 <body>
   <h1>Style Grader</h1>
-  <input type="file" id="upload" accept="image/*" />
-  <button id="analyze">Analyze</button>
+  <video id="video" width="320" height="240" autoplay></video>
+  <button id="snap">Take Photo</button>
+  <canvas id="canvas" width="320" height="240" style="display: none;"></canvas>
+  <button id="analyze" style="display: none;">Analyze</button>
   <div id="output"></div>
 
   <script>
-    document.getElementById('analyze').addEventListener('click', async () => {
-      const fileInput = document.getElementById('upload');
-      if (fileInput.files.length === 0) {
-        alert('Please select an image file.');
-        return;
-      }
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const snapButton = document.getElementById('snap');
+    const analyzeButton = document.getElementById('analyze');
+    const output = document.getElementById('output');
 
-      const file = fileInput.files[0];
-      const reader = new FileReader();
-      reader.onload = async function(event) {
-        const base64Image = event.target.result.split(',')[1];
-        const response = await fetch('https://api.llama.com/analyze', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer LA-4a7f1e22b7f34cc8b8ea473e2ee6c92ca5287ca391e543aca941b16346d7dc73'
-          },
-          body: JSON.stringify({ image: base64Image })
-        });
-        const result = await response.json();
-        document.getElementById('output').innerText = result.comment;
-      };
-      reader.readAsDataURL(file);
+    // Get access to the camera
+    navigator.mediaDevices.getUserMedia({ video: true })
+      .then((stream) => {
+        video.srcObject = stream;
+      })
+      .catch((err) => {
+        console.error('Error accessing the camera:', err);
+      });
+
+    // Take a snapshot when the button is clicked
+    snapButton.addEventListener('click', () => {
+      const context = canvas.getContext('2d');
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      analyzeButton.style.display = 'block';
+    });
+
+    // Analyze the photo
+    analyzeButton.addEventListener('click', async () => {
+      const dataURL = canvas.toDataURL('image/png');
+      const base64Image = dataURL.split(',')[1];
+      const response = await fetch('https://api.llama.com/analyze', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer LA-4a7f1e22b7f34cc8b8ea473e2ee6c92ca5287ca391e543aca941b16346d7dc73'
+        },
+        body: JSON.stringify({ image: base64Image })
+      });
+      const result = await response.json();
+      output.innerText = result.comment;
     });
   </script>
 </body>
