@@ -3,57 +3,123 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Style Grader</title>
+  <title>Stylish API Project</title>
   <style>
-    body { font-family: Arial, sans-serif; }
-    #output { margin-top: 20px; }
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      background-color: #f0f0f0;
+    }
+    h1 {
+      font-size: 2em;
+      margin-bottom: 20px;
+    }
+    input[type="file"] {
+      margin: 20px 0;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 1em;
+      border: none;
+      border-radius: 5px;
+      background-color: #007bff;
+      color: white;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    #result {
+      margin-top: 20px;
+      padding: 20px;
+      background-color: white;
+      border-radius: 5px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      width: 90%;
+      max-width: 600px;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+    }
   </style>
 </head>
 <body>
-  <h1>Style Grader</h1>
-  <video id="video" width="320" height="240" autoplay></video>
-  <button id="snap">Take Photo</button>
-  <canvas id="canvas" width="320" height="240" style="display: none;"></canvas>
-  <button id="analyze" style="display: none;">Analyze</button>
-  <div id="output"></div>
-
+  <h1>Stylish API Project</h1>
+  <input type="file" id="imageInput" accept="image/*" capture="user">
+  <button id="analyzeButton">Analyze Style</button>
+  <div id="result"></div>
+  
   <script>
-    const video = document.getElementById('video');
-    const canvas = document.getElementById('canvas');
-    const snapButton = document.getElementById('snap');
-    const analyzeButton = document.getElementById('analyze');
-    const output = document.getElementById('output');
+    const apiToken = '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'; // Your Hugging Face API token
+    const model = 'meta-llama/Llama-3.2-11B-Vision-Instruct';
 
-    // Get access to the camera
-    navigator.mediaDevices.getUserMedia({ video: true })
-      .then((stream) => {
-        video.srcObject = stream;
-      })
-      .catch((err) => {
-        console.error('Error accessing the camera:', err);
-      });
+    document.getElementById('analyzeButton').addEventListener('click', async () => {
+      const fileInput = document.getElementById('imageInput');
+      if (fileInput.files.length === 0) {
+        alert('Please select an image file or take a selfie.');
+        return;
+      }
 
-    // Take a snapshot when the button is clicked
-    snapButton.addEventListener('click', () => {
-      const context = canvas.getContext('2d');
-      context.drawImage(video, 0, 0, canvas.width, canvas.height);
-      analyzeButton.style.display = 'block';
-    });
+      const file = fileInput.files[0];
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64Image = reader.result.split(',')[1]; // Remove the data type prefix
+        
+        const prompt = {
+          "messages": [
+            {
+              "role": "system",
+              "content": "You are an advanced AI specializing in fashion analysis and style recommendations. Your task is to analyze the given image and provide a detailed style rating and feedback. Consider aspects such as outfit coordination, color harmony, fashion trends, and overall aesthetics. Please provide constructive feedback and style improvement suggestions."
+            },
+            {
+              "role": "user",
+              "content": [
+                {"type": "image_url", "image_url": {"url": base64Image}},
+                {"type": "text", "text": "Analyze the style in this image and provide a rating."}
+              ]
+            }
+          ],
+          "image": {
+            "content": base64Image
+          },
+          "functions": [
+            {
+              "name": "image_analysis",
+              "description": "Analyzes the image and provides a style rating.",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "image": {
+                    "type": "string",
+                    "description": "Base64-encoded image of the outfit to be analyzed."
+                  }
+                },
+                "required": ["image"]
+              }
+            }
+          ],
+          "function_call": "image_analysis"
+        };
 
-    // Analyze the photo
-    analyzeButton.addEventListener('click', async () => {
-      const dataURL = canvas.toDataURL('image/png');
-      const base64Image = dataURL.split(',')[1];
-      const response = await fetch('https://api.llama.com/analyze', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer LA-4a7f1e22b7f34cc8b8ea473e2ee6c92ca5287ca391e543aca941b16346d7dc73'
-        },
-        body: JSON.stringify({ image: base64Image })
-      });
-      const result = await response.json();
-      output.innerText = result.comment;
+        const response = await fetch('https://api-inference.huggingface.co/models/meta-llama/Llama-3.2-11B-Vision-Instruct', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(prompt)
+        });
+
+        const result = await response.json();
+        document.getElementById('result').innerText = JSON.stringify(result, null, 2);
+      };
+
+      reader.readAsDataURL(file);
     });
   </script>
 </body>
